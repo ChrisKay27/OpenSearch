@@ -19,7 +19,7 @@ public class WebCrawler {
     private static final Map<String, Integer> sameContentCount = new HashMap<>();
     private static final Map<String, String> robots = new HashMap<>();
     private static final Map<String, Integer> crawlRate = new HashMap<>();
-    private static final Set<String> disallowedRootUrls = new HashSet<>();
+    private static final Set<String> disallowedURLs = new HashSet<>();
 
     private static final Set<String> startUrls = new HashSet<>();
 
@@ -33,6 +33,7 @@ public class WebCrawler {
         pagesVisited.addAll(getPagesVisitedFromDatabase());
 
         startUrls.addAll(removeAllBut10(database.getStartUrls()));
+//        startUrls.addAll(database.getStartUrls());
 
         //getRobots(startUrls);
         processRobots();
@@ -51,6 +52,7 @@ public class WebCrawler {
     private static void processRobots() {
 
         for(String startUrl : startUrls ) {
+
             try (InputStream robotsTxtStream = new URL(startUrl+"robots.txt").openStream()) {
                 System.out.println("Robots.txt: " + startUrl+"robots.txt");
 
@@ -61,7 +63,8 @@ public class WebCrawler {
                 robotsTxt.getDisallowList("*").forEach(disallow -> {
                     if( disallow.startsWith("/") )
                         disallow = disallow.replaceFirst("/", "");
-                    disallowedRootUrls.add(startUrl + disallow);
+
+                    disallowedURLs.add(startUrl + disallow);
 
                     System.out.println("Disallow: " + startUrl + disallow);
                 });
@@ -73,17 +76,54 @@ public class WebCrawler {
         }
     }
 
-    private static void convertRobotsToRegexes() {
-        //Process disallow list converting the disallowed paths to regular expressions
-        List<String> newDisallowedList = new ArrayList<>();
-        for (String disallowedRootUrl : disallowedRootUrls) {
-            String regex = disallowedRootUrl.replace(".", "\\.").replace("*", ".*");
-            newDisallowedList.add(regex);
-        }
-        disallowedRootUrls.clear();
-        disallowedRootUrls.addAll(newDisallowedList);
-    }
+    public static void main(String[] args) {
 
+    }
+    /**
+     * Gets all the robot.txt files from the start sites in the database
+     */
+      private static void getRobots(Set<String> startUrls) {
+            for(String startUrl : startUrls ) {
+                try {
+                    Document doc = Jsoup.connect(startUrl + "robots.txt").get();
+                    String robotsTxt = doc.body().text();
+                    robots.put(startUrl, robotsTxt);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+      }
+
+
+//    private static void convertRobotsToRegexes() {
+//        //Process disallow list converting the disallowed paths to regular expressions
+//        List<String> newDisallowedList = new ArrayList<>();
+//        for( String disallowedRootUrl : disallowedRootUrls ){
+//            String escapedRegexCharacters = escapeRegexMetacharacters(disallowedRootUrl);
+//            newDisallowedList.add(escapedRegexCharacters);
+//        }
+//
+//        List<String> newDisallowedList2 = new ArrayList<>();
+//        for (String disallowedRootUrl : newDisallowedList) {
+//            String regex = disallowedRootUrl.replace("*", ".*");
+//            newDisallowedList2.add(regex);
+//        }
+//        disallowedRootUrls.clear();
+//        disallowedRootUrls.addAll(newDisallowedList2);
+//    }
+
+//    public static String escapeRegexMetacharacters(String input) {
+//        // Metacharacters that need to be escaped
+//        String[] metacharacters = {"\\", ".", "^", "$", "+", "?", "{", "}", "[", "]", "|", "(", ")"};
+//
+//        for (String metacharacter : metacharacters) {
+//            input = input.replace(metacharacter, "\\" + metacharacter);
+//        }
+//
+//        return input;
+//    }
+
+    private RobotsURLChecker robotsURLChecker = new RobotsURLChecker();
 
     public WebCrawler(){
 
@@ -107,14 +147,21 @@ public class WebCrawler {
 
         List<String> testURLs = TestURLs.getTestUrls();
 
-        convertRobotsToRegexes();
+
 
         System.out.println("Checking if the following urls are disallowed:\n");
 
         //Run test urls through the checkIfDisallowed method
-        testURLs.forEach(testURL ->
-                disallowedRootUrls.forEach(disallowedRootUrlRegexs ->
-                        System.out.println(testURL + " : " + ":" + disallowedRootUrlRegexs + " : " + testURL.matches(disallowedRootUrlRegexs))));
+        boolean passed = true;
+        for (String testURL : testURLs) {
+            webCrawler.robotsURLChecker.isURLDisallowed(testURL, disallowedURLs);
+            for (String disallowedRootUrlRegexs : disallowedURLs) {
+                boolean matches = testURL.matches(disallowedRootUrlRegexs);
+                System.out.println(testURL + " : " + ":" + disallowedRootUrlRegexs + " : " + matches);
+                passed &= !matches;
+            }
+        }
+        System.out.println(passed ? "\nPassed" : "\nFailed");
     }
 
 
@@ -161,7 +208,7 @@ public class WebCrawler {
     }
 
     private boolean isAllowed(String url) {
-        return disallowedRootUrls.stream().anyMatch(regex -> url.matches(regex));
+        return disallowedURLs.stream().anyMatch(regex -> url.matches(regex));
     }
 
     private static Set<String> getPagesVisitedFromDatabase(){

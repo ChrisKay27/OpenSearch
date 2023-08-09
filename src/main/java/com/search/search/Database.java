@@ -7,6 +7,18 @@ import java.util.Set;
 
 public class Database {
 
+//    static{
+//        Map<String, String> getenv = System.getenv();
+//        boolean foundKey = false;
+//        for( String key : getenv.keySet() ){
+//            //System.out.println(key + " : " + getenv.get(key));
+//            if( key.equals("SEARCH_PW") ){
+//                foundKey = true;
+//            }
+//        }
+//        System.out.println("Found key: " + foundKey);
+//    }
+
     //Local mysql db connection string. Use databaseInit.sql to create the database on a local mysql server
     private static String connString = "jdbc:mysql://localhost:3306/searchengine?serverTimezone=UTC";
 
